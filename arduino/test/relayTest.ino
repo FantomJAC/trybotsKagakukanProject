@@ -1,4 +1,5 @@
 #include<Servo.h>
+
 #define Relay 13
 #define ServoNeck 2
 #define ServoTail 1
@@ -16,31 +17,36 @@
 #define NeutralPosition 30
 #define Delay 500
 
+int count;
+
 Servo neck,foot;
-int ForwardSwitch;
-int RightSwitch;
-int LeftSwitch;
+int forward;
+int right;
+int left;
 
 void setup(){
-  Serial.begin(9600);
-  pinMode(JoystickForward,INPUT);
-  pinMode(JoystickRight,INPUT);
-  pinMode(JoystickLeft,INPUT);
-  pinMode(Relay,OUTPUT);
+  Serial.begin(115200);
+  pinMode(JoystickForward, INPUT);
+  pinMode(JoystickRight, INPUT);
+  pinMode(JoystickLeft, INPUT);
+  pinMode(Relay, OUTPUT);
   neck.attach(ServoNeck);
   foot.attach(ServoFoot); 
-  delay(3000);
-   
+  count = 0;
 }
 
 void loop(){
-  ForwardSwitch = digitalRead(JoystickForward);
-  RightSwitch = digitalRead(JoystickRight);
-  LeftSwitch = digitalRead(JoystickLeft);
-    
-  digitalWrite(Relay,HIGH);
-  delay(3000);
-  digitalWrite(Relay,LOW);
-  delay(3000);
-  
+  forward = digitalRead(JoystickForward);
+  right = digitalRead(JoystickRight);
+  left = digitalRead(JoystickLeft);
+  if (count > 100) {
+    count = 0;
+    if (forward) {
+      digitalWrite(Relay, HIGH);
+    } else {
+      digitalWrite(Relay, LOW);
+    }
+  } else {
+  count++;
+  }
 }
