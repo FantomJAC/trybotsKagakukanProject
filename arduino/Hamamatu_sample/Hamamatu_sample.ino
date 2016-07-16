@@ -1,9 +1,3 @@
-/*
- * Copyright (c) 2016 Trybots. All Rights Reserved.
- *
- *
- */
-
 #include<Servo.h>
 
 //#define LOG_ENABLED
@@ -16,35 +10,24 @@
 #define TIMEOUT					500
 
 #define JOYSTICK_FORWARD_PIN	4
-#define JOYSTICK_RIGHT_PIN		5
 #define JOYSTICK_FORWARD2_PIN	6
+#define JOYSTICK_RIGHT_PIN		5
 #define JOYSTICK_LEFT_PIN		7
 
 #define MOTOR_PIN				13
 
 #define NUM_SERVO				2
-#define SERVO_MIN				20
-#define SERVO_MAX				160
 #define SERVO_CENTER			90
 #define SERVO_NECK_ID			0
 #define SERVO_FOOT_ID			1
 
 #if (UNIT_ID == 0)
 #define SERVO_NECK_PIN			9
-#define SERVO_NECK_OFFSET		-9
-#define SERVO_NECK_MIN			75
-#define SERVO_NECK_MAX			105
+//#define SERVO_NECK_OFFSET		0		// FIXME!!
+//#define SERVO_NECK_MIN			0		// FIXME!!
+//#define SERVO_NECK_MAX			180		// FIXME!!
 #define SERVO_FOOT_PIN			10
-#define SERVO_FOOT_OFFSET		5
-#define SERVO_FOOT_MIN			75
-#define SERVO_FOOT_MAX			105
-#elif (UNIT_ID == 1)
-#define SERVO_NECK_PIN			9
-#define SERVO_NECK_OFFSET		-12
-#define SERVO_NECK_MIN			75
-#define SERVO_NECK_MAX			105
-#define SERVO_FOOT_PIN			10
-#define SERVO_FOOT_OFFSET		2
+#define SERVO_FOOT_OFFSET		6
 #define SERVO_FOOT_MIN			75
 #define SERVO_FOOT_MAX			105
 #else
@@ -90,12 +73,6 @@ void ServoWrite(ServoDef_t *servo, int angle) {
 		actualAngle = servo->min;
 	}
 	actualAngle += servo->offset;
-	if (actualAngle > SERVO_MAX) {
-		actualAngle = SERVO_MAX;
-	}
-	if (actualAngle < SERVO_MIN) {
-		actualAngle = SERVO_MIN;
-	}
 	if (actualAngle != servo->prevAngle) {
 #ifdef LOG_ENABLED
 		Serial.print("Servo Write: id=");
@@ -117,11 +94,9 @@ ServoDef_t servoNeck;
 ServoDef_t servoFoot;
 ServoDef_t *servoTable[NUM_SERVO];
 int forward1, forward2, right, left;
+int counter = 0;
 
 void setup() {
-#ifdef LOG_ENABLED
-	Serial.begin(115200);
-#endif
 	/* Servo - Neck */
 	servoNeck.id = SERVO_NECK_ID;
 	servoNeck.pin = SERVO_NECK_PIN;
@@ -150,11 +125,14 @@ void setup() {
 	pinMode(JOYSTICK_RIGHT_PIN, INPUT);
 	pinMode(JOYSTICK_LEFT_PIN, INPUT);
 	pinMode(MOTOR_PIN, OUTPUT);
+
+#ifdef LOG_ENABLED
+	Serial.begin(115200);
+#endif
 }
 
 #ifdef TEST_MODE
 void loop() {
-#ifdef TEST_MODE_LOOP
 	ServoDef_t *servo = servoTable[TEST_ID];
 	int pos = SERVO_CENTER;
 	int delta = 1;
@@ -169,7 +147,6 @@ void loop() {
 		}
 		delay(TEST_DELAY);
 	}
-#endif
 }
 #else
 void tick() {
@@ -185,14 +162,14 @@ void tick() {
 #ifdef LOG_ENABLED
 	Serial.println("Right");
 #endif
-		ServoWrite(servoTable[SERVO_NECK_ID], SERVO_NECK_MAX);
+		ServoWrite(servoTable[SERVO_NECK_ID], 100);
 		ServoWrite(servoTable[SERVO_FOOT_ID], SERVO_FOOT_MAX);
 	} else if (left) {
 		/* Left */
 #ifdef LOG_ENABLED
 	Serial.println("Left");
 #endif
-		ServoWrite(servoTable[SERVO_NECK_ID], SERVO_NECK_MIN);
+		ServoWrite(servoTable[SERVO_NECK_ID], 80);
 		ServoWrite(servoTable[SERVO_FOOT_ID], SERVO_FOOT_MIN);
 	} else {
 		/* Center */
@@ -205,7 +182,6 @@ void tick() {
 }
 
 void loop() {
-	static int counter = 0;
 	forward1 = digitalRead(JOYSTICK_FORWARD_PIN);
 	forward2 = digitalRead(JOYSTICK_FORWARD2_PIN);
 	right = digitalRead(JOYSTICK_RIGHT_PIN);
