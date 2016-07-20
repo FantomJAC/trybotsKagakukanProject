@@ -9,6 +9,7 @@
 //#define LOG_ENABLED
 //#define TEST_MODE
 #define UNIT_ID					0
+#define CURIE_BLE
 
 /******************************************************************************
  * Consts
@@ -23,8 +24,8 @@
 #define MOTOR_PIN				13
 
 #define NUM_SERVO				2
-#define SERVO_MIN				20
-#define SERVO_MAX				160
+#define SERVO_ABS_MIN			20
+#define SERVO_ABS_MAX			160
 #define SERVO_CENTER			90
 #define SERVO_NECK_ID			0
 #define SERVO_FOOT_ID			1
@@ -90,11 +91,11 @@ void ServoWrite(ServoDef_t *servo, int angle) {
 		actualAngle = servo->min;
 	}
 	actualAngle += servo->offset;
-	if (actualAngle > SERVO_MAX) {
-		actualAngle = SERVO_MAX;
+	if (actualAngle > SERVO_ABS_MAX) {
+		actualAngle = SERVO_ABS_MAX;
 	}
-	if (actualAngle < SERVO_MIN) {
-		actualAngle = SERVO_MIN;
+	if (actualAngle < SERVO_ABS_MIN) {
+		actualAngle = SERVO_ABS_MIN;
 	}
 	if (actualAngle != servo->prevAngle) {
 #ifdef LOG_ENABLED
@@ -109,6 +110,29 @@ void ServoWrite(ServoDef_t *servo, int angle) {
 		servo->prevAngle = actualAngle;
 	}
 }
+
+/******************************************************************************
+ * BLE (Curie)
+ ******************************************************************************/
+#ifdef CURIE_BLE
+#include <BLEAttribute.h>
+#include <BLECentral.h>
+#include <BLECharacteristic.h>
+#include <BLECommon.h>
+#include <BLEDescriptor.h>
+#include <BLEPeripheral.h>
+#include <BLEService.h>
+#include <BLETypedCharacteristic.h>
+#include <BLETypedCharacteristics.h>
+#include <BLEUuid.h>
+#include <CurieBLE.h>
+
+#define STATUS_PIN		12
+BLEPeripheral blePeripheral;
+BLEService tbService("6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
+BLECharacteristic servoChar("6E400002-B5A3-F393-E0A9-E50E24DCCA9E", BLEWriteWithoutResponse, 2);
+BLECharacteristic motorChar("6E400004-B5A3-F393-E0A9-E50E24DCCA9E", BLEWriteWithoutResponse, 1);
+#endif
 
 /******************************************************************************
  * Main
@@ -144,12 +168,30 @@ void setup() {
 		ServoWrite(servoTable[i], SERVO_CENTER);
 	}
 
+#ifdef CURIE_BLE
+	/* Init GPIO */
+	pinMode(STATUS_PIN, OUTPUT);
+
+	/* Init BLE */
+	blePeripheral.setLocalName("Trybots");
+	blePeripheral.setAdvertisedServiceUuid(tbService.uuid());
+	blePeripheral.addAttribute(tbService);
+	blePeripheral.addAttribute(servoChar);
+	blePeripheral.addAttribute(motorChar);
+
+	blePeripheral.begin();
+#ifdef LOG_ENABLED
+	Serial.println("Bluetooth device active, waiting for connections...");
+#endif
+#else
 	/* Init GPIO */
 	pinMode(JOYSTICK_FORWARD_PIN, INPUT);
 	pinMode(JOYSTICK_FORWARD2_PIN, INPUT);
 	pinMode(JOYSTICK_RIGHT_PIN, INPUT);
+
 	pinMode(JOYSTICK_LEFT_PIN, INPUT);
 	pinMode(MOTOR_PIN, OUTPUT);
+#endif
 }
 
 #ifdef TEST_MODE
@@ -170,6 +212,35 @@ void loop() {
 		delay(TEST_DELAY);
 	}
 #endif
+}
+#else
+#ifdef CURIE_BLE
+void loop() {
+	BLECentral central = blePeripheral.central();
+	if (central) {
+#ifdef LOG_ENABLED
+		Serial.print("Connected to central: ");
+		Serial.println(central.address());
+#endif
+		digitalWrite(STATUS_PIN, HIGH);
+		while (central.connected()) {
+			if (servoChar.written()) {
+				ServoWrite(servoTable[SERVO_NECK_ID], servoChar.value()[0]);
+				ServoWrite(servoTable[SERVO_FOOT_ID], servoChar.value()[1]);
+			}
+			if (motorChar.written()) {
+				digitalWrite(MOTOR_PIN, motorChar.value()[0] ? HIGH : LOW);
+			}
+		}
+		/* Default */
+		ServoWrite(servoTable[SERVO_NECK_ID], SERVO_CENTER);
+		ServoWrite(servoTable[SERVO_FOOT_ID], SERVO_CENTER);
+		digitalWrite(STATUS_PIN, LOW);
+#ifdef LOG_ENABLED
+		Serial.print("Disconnected from central: ");
+		Serial.println(central.address());
+#endif
+	}
 }
 #else
 void tick() {
@@ -215,4 +286,5 @@ void loop() {
 		tick();
 	}
 }
+#endif
 #endif
