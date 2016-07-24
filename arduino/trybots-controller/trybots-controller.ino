@@ -21,7 +21,12 @@
 #define JOYSTICK_FORWARD2_PIN	6
 #define JOYSTICK_LEFT_PIN		7
 
+#ifdef CURIE_BLE
+/* XXX: Do not use pin 13 for Arduino 101 */
+#define MOTOR_PIN				12
+#else
 #define MOTOR_PIN				13
+#endif
 
 #define NUM_SERVO				2
 #define SERVO_ABS_MIN			20
