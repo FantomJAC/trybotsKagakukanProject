@@ -6,9 +6,9 @@
 
 #include<Servo.h>
 
-//#define LOG_ENABLED
+#define LOG_ENABLED
 //#define TEST_MODE
-#define UNIT_ID					0
+#define UNIT_ID					1
 #define CURIE_BLE
 
 /******************************************************************************
@@ -35,22 +35,25 @@
 #define SERVO_NECK_ID			0
 #define SERVO_FOOT_ID			1
 
-#if (UNIT_ID == 0)
 #define SERVO_NECK_PIN			9
+#ifdef CURIE_BLE
+#define SERVO_FOOT_PIN			3
+#else
+#define SERVO_FOOT_PIN			10
+#endif
+
+#if (UNIT_ID == 0)
 #define SERVO_NECK_OFFSET		-9
 #define SERVO_NECK_MIN			75
 #define SERVO_NECK_MAX			105
-#define SERVO_FOOT_PIN			10
-#define SERVO_FOOT_OFFSET		5
+#define SERVO_FOOT_OFFSET		10
 #define SERVO_FOOT_MIN			75
 #define SERVO_FOOT_MAX			105
 #elif (UNIT_ID == 1)
-#define SERVO_NECK_PIN			9
-#define SERVO_NECK_OFFSET		-12
+#define SERVO_NECK_OFFSET		15
 #define SERVO_NECK_MIN			75
 #define SERVO_NECK_MAX			105
-#define SERVO_FOOT_PIN			10
-#define SERVO_FOOT_OFFSET		2
+#define SERVO_FOOT_OFFSET		10
 #define SERVO_FOOT_MIN			75
 #define SERVO_FOOT_MAX			105
 #else
@@ -173,8 +176,15 @@ void setup() {
 		ServoWrite(servoTable[i], SERVO_CENTER);
 	}
 
-#ifdef CURIE_BLE
 	/* Init GPIO */
+	pinMode(JOYSTICK_FORWARD_PIN, INPUT);
+	pinMode(JOYSTICK_FORWARD2_PIN, INPUT);
+	pinMode(JOYSTICK_RIGHT_PIN, INPUT);
+	pinMode(JOYSTICK_LEFT_PIN, INPUT);
+	pinMode(MOTOR_PIN, OUTPUT);
+
+	digitalWrite(MOTOR_PIN, LOW);
+#ifdef CURIE_BLE
 	pinMode(STATUS_PIN, OUTPUT);
 
 	/* Init BLE */
@@ -188,14 +198,6 @@ void setup() {
 #ifdef LOG_ENABLED
 	Serial.println("Bluetooth device active, waiting for connections...");
 #endif
-#else
-	/* Init GPIO */
-	pinMode(JOYSTICK_FORWARD_PIN, INPUT);
-	pinMode(JOYSTICK_FORWARD2_PIN, INPUT);
-	pinMode(JOYSTICK_RIGHT_PIN, INPUT);
-
-	pinMode(JOYSTICK_LEFT_PIN, INPUT);
-	pinMode(MOTOR_PIN, OUTPUT);
 #endif
 }
 
@@ -223,6 +225,7 @@ void loop() {
 void loop() {
 	BLECentral central = blePeripheral.central();
 	if (central) {
+		int timeCount = 0;
 #ifdef LOG_ENABLED
 		Serial.print("Connected to central: ");
 		Serial.println(central.address());
@@ -232,14 +235,20 @@ void loop() {
 			if (servoChar.written()) {
 				ServoWrite(servoTable[SERVO_NECK_ID], servoChar.value()[0]);
 				ServoWrite(servoTable[SERVO_FOOT_ID], servoChar.value()[1]);
+				timeCount = 0;
 			}
 			if (motorChar.written()) {
 				digitalWrite(MOTOR_PIN, motorChar.value()[0] ? HIGH : LOW);
+			}
+			if (timeCount++ > 200) {
+				digitalWrite(MOTOR_PIN, LOW);
+				blePeripheral.disconnect();
 			}
 		}
 		/* Default */
 		ServoWrite(servoTable[SERVO_NECK_ID], SERVO_CENTER);
 		ServoWrite(servoTable[SERVO_FOOT_ID], SERVO_CENTER);
+		digitalWrite(MOTOR_PIN, LOW);
 		digitalWrite(STATUS_PIN, LOW);
 #ifdef LOG_ENABLED
 		Serial.print("Disconnected from central: ");
