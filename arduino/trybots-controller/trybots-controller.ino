@@ -11,6 +11,10 @@
 #define UNIT_ID					1
 #define CURIE_BLE
 
+#ifdef CURIE_BLE
+#include <CurieBLE.h>
+#endif
+
 /******************************************************************************
  * Consts
  ******************************************************************************/
@@ -123,18 +127,6 @@ void ServoWrite(ServoDef_t *servo, int angle) {
  * BLE (Curie)
  ******************************************************************************/
 #ifdef CURIE_BLE
-#include <BLEAttribute.h>
-#include <BLECentral.h>
-#include <BLECharacteristic.h>
-#include <BLECommon.h>
-#include <BLEDescriptor.h>
-#include <BLEPeripheral.h>
-#include <BLEService.h>
-#include <BLETypedCharacteristic.h>
-#include <BLETypedCharacteristics.h>
-#include <BLEUuid.h>
-#include <CurieBLE.h>
-
 #define STATUS_PIN		11
 BLEPeripheral blePeripheral;
 BLEService tbService("6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
@@ -193,6 +185,10 @@ void setup() {
 	blePeripheral.addAttribute(tbService);
 	blePeripheral.addAttribute(servoChar);
 	blePeripheral.addAttribute(motorChar);
+	blePeripheral.setEventHandler(BLEConnected, blePeripheralConnectHandler);
+	blePeripheral.setEventHandler(BLEDisconnected, blePeripheralDisconnectHandler);
+	servoChar.setEventHandler(BLEWritten, servoCharWrittenHandler);
+	motorChar.setEventHandler(BLEWritten, motorCharWrittenHandler);
 
 	blePeripheral.begin();
 #ifdef LOG_ENABLED
@@ -223,40 +219,44 @@ void loop() {
 #else
 #ifdef CURIE_BLE
 void loop() {
-	BLECentral central = blePeripheral.central();
-	if (central) {
+	blePeripheral.poll();
+}
+
+void blePeripheralConnectHandler(BLECentral& central) {
+	digitalWrite(STATUS_PIN, HIGH);
 #ifdef LOG_ENABLED
-		Serial.print("Connected to central: ");
-		Serial.println(central.address());
+	Serial.print("Connected event, central: ");
+	Serial.println(central.address());
 #endif
-		digitalWrite(STATUS_PIN, HIGH);
-		while (central.connected()) {
-			if (servoChar.written()) {
+}
+
+void blePeripheralDisconnectHandler(BLECentral& central) {
+	/* Default */
+	ServoWrite(servoTable[SERVO_NECK_ID], SERVO_CENTER);
+	ServoWrite(servoTable[SERVO_FOOT_ID], SERVO_CENTER);
+	digitalWrite(MOTOR_PIN, LOW);
+	digitalWrite(STATUS_PIN, LOW);
 #ifdef LOG_ENABLED
-				Serial.print("Servo Write: ");
-				Serial.println(servoChar.value()[0]);
+	Serial.print("Disconnected event, central: ");
+	Serial.println(central.address());
 #endif
-				ServoWrite(servoTable[SERVO_NECK_ID], servoChar.value()[0]);
-				ServoWrite(servoTable[SERVO_FOOT_ID], servoChar.value()[1]);
-			}
-			if (motorChar.written()) {
+}
+
+void servoCharWrittenHandler(BLECentral& central, BLECharacteristic& characteristic) {
 #ifdef LOG_ENABLED
-				Serial.print("Motor Write: ");
-				Serial.println(motorChar.value()[0]);
+	Serial.print("Servo Write: ");
+	Serial.println(servoChar.value()[0]);
 #endif
-				digitalWrite(MOTOR_PIN, motorChar.value()[0] ? HIGH : LOW);
-			}
-		}
-		/* Default */
-		ServoWrite(servoTable[SERVO_NECK_ID], SERVO_CENTER);
-		ServoWrite(servoTable[SERVO_FOOT_ID], SERVO_CENTER);
-		digitalWrite(MOTOR_PIN, LOW);
-		digitalWrite(STATUS_PIN, LOW);
+	ServoWrite(servoTable[SERVO_NECK_ID], servoChar.value()[0]);
+	ServoWrite(servoTable[SERVO_FOOT_ID], servoChar.value()[1]);
+}
+
+void motorCharWrittenHandler(BLECentral& central, BLECharacteristic& characteristic) {
 #ifdef LOG_ENABLED
-		Serial.print("Disconnected from central: ");
-		Serial.println(central.address());
+	Serial.print("Motor Write: ");
+	Serial.println(motorChar.value()[0]);
 #endif
-	}
+	digitalWrite(MOTOR_PIN, motorChar.value()[0] ? HIGH : LOW);
 }
 #else
 void tick() {
