@@ -135,7 +135,7 @@ void ServoWrite(ServoDef_t *servo, int angle) {
 #include <BLEUuid.h>
 #include <CurieBLE.h>
 
-#define STATUS_PIN		12
+#define STATUS_PIN		11
 BLEPeripheral blePeripheral;
 BLEService tbService("6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
 BLECharacteristic servoChar("6E400002-B5A3-F393-E0A9-E50E24DCCA9E", BLEWriteWithoutResponse, 2);
@@ -225,7 +225,6 @@ void loop() {
 void loop() {
 	BLECentral central = blePeripheral.central();
 	if (central) {
-		int timeCount = 0;
 #ifdef LOG_ENABLED
 		Serial.print("Connected to central: ");
 		Serial.println(central.address());
@@ -233,16 +232,19 @@ void loop() {
 		digitalWrite(STATUS_PIN, HIGH);
 		while (central.connected()) {
 			if (servoChar.written()) {
+#ifdef LOG_ENABLED
+				Serial.print("Servo Write: ");
+				Serial.println(servoChar.value()[0]);
+#endif
 				ServoWrite(servoTable[SERVO_NECK_ID], servoChar.value()[0]);
 				ServoWrite(servoTable[SERVO_FOOT_ID], servoChar.value()[1]);
-				timeCount = 0;
 			}
 			if (motorChar.written()) {
+#ifdef LOG_ENABLED
+				Serial.print("Motor Write: ");
+				Serial.println(motorChar.value()[0]);
+#endif
 				digitalWrite(MOTOR_PIN, motorChar.value()[0] ? HIGH : LOW);
-			}
-			if (timeCount++ > 200) {
-				digitalWrite(MOTOR_PIN, LOW);
-				blePeripheral.disconnect();
 			}
 		}
 		/* Default */
